@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Crisis Orchestrator</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <span class="eyebrow">Hotel Emergency Ops</span>
+        <h1>AI Crisis Orchestrator</h1>
+        <p>Rapid triage, coordinated dispatch, and live incident response in one console.</p>
+      </div>
+      <div class="topbar-status">
+        <div class="top-stat">
+          <span class="top-stat-label">System</span>
+          <span class="top-stat-value">Live Monitoring</span>
+        </div>
+        <div class="top-stat">
+          <span class="top-stat-label">Mode</span>
+          <span class="top-stat-value">Prototype Command Center</span>
+        </div>
+      </div>
+    </header>
+
+    <div id="alert-banner" class="hidden">
+      <span id="banner-text">ACTIVE CRISIS ALERT</span>
+    </div>
+
+    <main class="workspace">
+      <section class="input-section">
+        <div class="section-heading">
+          <div>
+            <span class="section-kicker">Incident Intake</span>
+            <h2>Report a Crisis</h2>
+            <p class="section-copy">Capture the incident fast, then let the dashboard coordinate responders, escalation, and logging.</p>
+          </div>
+          <div class="voice-tools">
+            <button id="voice-btn" class="voice-btn" type="button" aria-label="Start voice input">
+              <span class="voice-icon" aria-hidden="true"></span>
+            </button>
+            <span id="voice-status" class="voice-status">Voice input ready</span>
+          </div>
+        </div>
+
+        <div class="intake-grid">
+          <div class="intake-form">
+            <label for="crisis-input">Describe the emergency</label>
+            <textarea
+              id="crisis-input"
+              rows="4"
+              placeholder="e.g. Smoke detected near the second-floor banquet hall and guests are gathering by the stairwell"
+            ></textarea>
+
+            <div class="input-row">
+              <div>
+                <label for="floor-select">Incident floor</label>
+                <select id="floor-select">
+                  <option value="1">Floor 1</option>
+                  <option value="2">Floor 2</option>
+                  <option value="3">Floor 3</option>
+                  <option value="4">Floor 4</option>
+                  <option value="5">Floor 5</option>
+                </select>
+              </div>
+              <button id="analyze-btn" class="primary-btn" onclick="analyzeCrisis()">
+                Analyze and Coordinate
+              </button>
+            </div>
+          </div>
+
+          <aside class="intake-sidecard">
+            <span class="pill-label">Demo prompts</span>
+            <ul class="hint-list">
+              <li>Kitchen fire spreading toward corridor ventilation</li>
+              <li>Guest collapsed in lobby and is unresponsive</li>
+              <li>Suspicious person reported outside room corridor</li>
+              <li>Water leakage near electrical panel on upper floor</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <div id="loading" class="hidden">
+        <div class="spinner"></div>
+        <p>AI is analyzing the crisis...</p>
+      </div>
+
+      <section id="dashboard" class="hidden">
+        <div class="hero-panel">
+          <div class="hero-main">
+            <div class="hero-heading">
+              <div>
+                <span class="section-kicker">Active Incident</span>
+                <h2 id="crisis-type">-</h2>
+              </div>
+              <span id="incident-id" class="chip chip-neutral">Incident -</span>
+            </div>
+            <p id="summary" class="summary-text">-</p>
+
+            <div class="hero-meta">
+              <div class="meta-card">
+                <span class="meta-label">Severity</span>
+                <span class="meta-value" id="severity">-</span>
+              </div>
+              <div class="meta-card">
+                <span class="meta-label">Location</span>
+                <span class="meta-value" id="incident-location">-</span>
+              </div>
+              <div class="meta-card">
+                <span class="meta-label">Last Update</span>
+                <span class="meta-value" id="updated-at">-</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-side">
+            <div class="hero-status-card">
+              <span class="card-label">Response Snapshot</span>
+              <div class="overview-cards compact-overview">
+                <div class="card">
+                  <span class="card-label">Total Incidents</span>
+                  <span id="total-incidents" class="card-value">0</span>
+                </div>
+                <div class="card">
+                  <span class="card-label">Active</span>
+                  <span id="active-incidents" class="card-value">0</span>
+                </div>
+                <div class="card">
+                  <span class="card-label">High Severity</span>
+                  <span id="high-severity-count" class="card-value">0</span>
+                </div>
+                <div class="card">
+                  <span class="card-label">Avg Distance</span>
+                  <span id="avg-distance" class="card-value">0.0 floors</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="section-block priority-block">
+            <div class="block-head">
+              <div>
+                <span class="section-kicker">Action Center</span>
+                <h3>One-Click Escalation</h3>
+              </div>
+            </div>
+            <p class="section-copy action-copy">Each action changes staff states, timeline events, and response posture. Active actions stay locked until you undo them.</p>
+            <div id="escalation-actions" class="action-buttons"></div>
+          </section>
+
+          <section class="section-block">
+            <div class="block-head">
+              <div>
+                <span class="section-kicker">Protocol</span>
+                <h3>Emergency Checklist</h3>
+              </div>
+            </div>
+            <div id="checklist-list" class="checklist-list"></div>
+          </section>
+
+          <section class="section-block wide-block">
+            <div class="block-head">
+              <div>
+                <span class="section-kicker">Dispatch Board</span>
+                <h3>Staff Assignments</h3>
+              </div>
+            </div>
+            <div id="assignments"></div>
+          </section>
+
+          <section class="section-block">
+            <div class="block-head">
+              <div>
+                <span class="section-kicker">Operations Log</span>
+                <h3>Live Incident Timeline</h3>
+              </div>
+            </div>
+            <div id="timeline-list" class="timeline-list"></div>
+          </section>
+
+          <section class="section-block">
+            <div class="block-head">
+              <div>
+                <span class="section-kicker">Immediate Response</span>
+                <h3>Priority Actions</h3>
+              </div>
+            </div>
+            <ol id="actions"></ol>
+          </section>
+
+          <section class="section-block">
+            <div class="block-head">
+              <div>
+                <span class="section-kicker">Insights</span>
+                <h3>Analytics Dashboard</h3>
+              </div>
+            </div>
+            <div class="analytics-notes">
+              <p><strong>Most common type:</strong> <span id="common-type">No incidents yet</span></p>
+              <p id="response-trend">No response trend available yet.</p>
+            </div>
+            <div class="utilization-block">
+              <span class="card-label">Staff Utilization</span>
+              <div id="utilization-list" class="utilization-list"></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="history-section" class="section-block history-section">
+        <div class="block-head">
+          <div>
+            <span class="section-kicker">Audit Trail</span>
+            <h2>Crisis History</h2>
+          </div>
+        </div>
+        <div id="history-list">
+          <p class="no-history">No crises recorded yet.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
