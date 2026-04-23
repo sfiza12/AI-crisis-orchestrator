@@ -247,6 +247,78 @@
     </main>
   </div>
 
+  <!-- History Modal -->
+  <div id="history-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <h2 id="modal-title">Crisis View</h2>
+          <span id="modal-mode" class="chip chip-neutral">-</span>
+        </div>
+        <button id="close-modal-btn" class="ghost-btn">&times;</button>
+      </div>
+      <div class="modal-body dashboard-grid">
+        <div class="hero-panel" style="grid-column: 1 / -1; margin-bottom: 0;">
+          <div class="hero-main" style="width: 100%;">
+            <div class="hero-heading">
+              <div>
+                <span class="section-kicker">Historical Incident</span>
+                <h2 id="modal-crisis-type">-</h2>
+              </div>
+              <div class="hero-heading-side">
+                <span id="modal-status" class="chip chip-neutral">-</span>
+                <span id="modal-severity" class="chip">-</span>
+                <span id="modal-incident-id" class="chip chip-neutral">Incident -</span>
+              </div>
+            </div>
+            <p id="modal-summary" class="summary-text">-</p>
+            <div class="hero-meta">
+              <div class="meta-card">
+                <span class="meta-label">Location</span>
+                <span class="meta-value" id="modal-location">-</span>
+              </div>
+              <div class="meta-card">
+                <span class="meta-label">Time Logged</span>
+                <span class="meta-value" id="modal-time">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="section-block">
+          <div class="block-head">
+            <div>
+              <span class="section-kicker">Protocol</span>
+              <h3>Emergency Checklist</h3>
+            </div>
+          </div>
+          <div id="modal-checklist-list" class="checklist-list" style="margin-top: 14px;"></div>
+        </section>
+
+        <section class="section-block">
+          <div class="block-head">
+            <div>
+              <span class="section-kicker">Operations Log</span>
+              <h3>Incident Timeline</h3>
+            </div>
+          </div>
+          <div id="modal-timeline-list" class="timeline-list" style="margin-top: 14px;"></div>
+        </section>
+
+        <section class="section-block wide-block">
+          <div class="block-head">
+            <div>
+              <span class="section-kicker">Dispatch Board</span>
+              <h3>Staff Assignments</h3>
+            </div>
+          </div>
+          <div id="modal-assignments" style="margin-top: 14px;"></div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
   <script src="/static/script.js"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 let currentIncident = null;
 let recognition = null;
+let historyCache = [];
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -275,6 +276,7 @@ function showBanner(severity, responseMode) {
 async function loadHistory() {
   const res = await fetch("/history");
   const history = await res.json();
+  historyCache = history;
   const list = document.getElementById("history-list");
 
   if (history.length === 0) {
@@ -286,6 +288,7 @@ async function loadHistory() {
   [...history].reverse().forEach(item => {
     const card = document.createElement("div");
     card.className = "history-card";
+    card.addEventListener("click", () => openHistoryModal(item.incident_id));
     card.innerHTML = `
       <div class="history-left">
         <div class="history-type">${escapeHtml(item.crisis_type)} <span class="chip chip-neutral">#${escapeHtml(item.incident_id)}</span></div>
@@ -362,3 +365,83 @@ initVoiceInput();
 initQuickPrompts();
 loadHistory();
 loadAnalytics();
+
+function openHistoryModal(incidentId) {
+  const incident = historyCache.find(i => i.incident_id === incidentId);
+  if (!incident) return;
+
+  document.getElementById("modal-crisis-type").textContent = incident.crisis_type;
+  document.getElementById("modal-summary").textContent = incident.summary;
+  document.getElementById("modal-location").textContent = incident.location;
+  document.getElementById("modal-time").textContent = incident.timestamp;
+  document.getElementById("modal-incident-id").textContent = `Incident #${incident.incident_id}`;
+  document.getElementById("modal-mode").textContent = incident.response_mode;
+  document.getElementById("modal-mode").className = `chip ${incident.response_source === "ai" ? "chip-on-site" : "chip-busy"}`;
+  
+  const statusEl = document.getElementById("modal-status");
+  statusEl.textContent = incident.resolved ? "Resolved" : "Active";
+  statusEl.className = `chip ${incident.resolved ? "chip-available" : "chip-responding"}`;
+
+  const sev = document.getElementById("modal-severity");
+  sev.textContent = incident.severity;
+  sev.className = `chip severity-${incident.severity.toLowerCase()}`;
+
+  // Timeline
+  const tlList = document.getElementById("modal-timeline-list");
+  tlList.innerHTML = "";
+  incident.timeline.forEach((event, index) => {
+    const item = document.createElement("div");
+    item.className = `timeline-item ${index === incident.timeline.length - 1 ? "timeline-item-latest" : ""}`;
+    item.innerHTML = `
+      <span class="timeline-time">${escapeHtml(event.time)}</span>
+      <div class="timeline-content">
+        <div class="timeline-title">${escapeHtml(event.title)}</div>
+        <div class="timeline-detail">${escapeHtml(event.detail)}</div>
+      </div>
+    `;
+    tlList.appendChild(item);
+  });
+
+  // Checklist
+  const ckList = document.getElementById("modal-checklist-list");
+  ckList.innerHTML = "";
+  incident.checklist.forEach(item => {
+    const row = document.createElement("label");
+    row.className = `checklist-item ${item.completed ? "completed" : ""}`;
+    row.innerHTML = `
+      <input type="checkbox" ${item.completed ? "checked" : ""} disabled />
+      <span>${escapeHtml(item.label)}</span>
+    `;
+    ckList.appendChild(row);
+  });
+
+  // Assignments
+  const asList = document.getElementById("modal-assignments");
+  asList.innerHTML = "";
+  incident.assignments.forEach(person => {
+    const availabilityClass = person.availability.toLowerCase().replace(/\s+/g, "-");
+    const card = document.createElement("div");
+    card.className = "assignment-card";
+    card.innerHTML = `
+      <div class="assignment-top">
+        <div class="assignment-name">${escapeHtml(person.name)} <span class="floor-badge">Floor ${escapeHtml(person.floor)}</span></div>
+        <span class="chip chip-${availabilityClass}">${escapeHtml(person.availability)}</span>
+      </div>
+      <div class="assignment-role">${escapeHtml(person.role)} | ${escapeHtml(person.status)}</div>
+      <div class="assignment-task" style="margin-top: 10px;">Task: ${escapeHtml(person.task)}</div>
+    `;
+    asList.appendChild(card);
+  });
+
+  const modal = document.getElementById("history-modal");
+  modal.classList.remove("hidden");
+  
+  document.getElementById("close-modal-btn").onclick = closeHistoryModal;
+  modal.addEventListener("click", (e) => {
+    if(e.target === modal) closeHistoryModal();
+  });
+}
+
+function closeHistoryModal() {
+  document.getElementById("history-modal").classList.add("hidden");
+}
