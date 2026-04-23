@@ -55,6 +55,12 @@
               placeholder="e.g. Smoke detected near the second-floor banquet hall and guests are gathering by the stairwell"
             ></textarea>
 
+            <div class="quick-prompts">
+              <button type="button" class="prompt-chip" data-prompt="Kitchen fire spreading toward corridor ventilation on Floor 2">Fire Demo</button>
+              <button type="button" class="prompt-chip" data-prompt="Guest collapsed in the lobby and is unresponsive near the elevators">Medical Demo</button>
+              <button type="button" class="prompt-chip" data-prompt="Suspicious person reported outside the guest room corridor on Floor 3">Security Demo</button>
+            </div>
+
             <div class="input-row">
               <div>
                 <label for="floor-select">Incident floor</label>
@@ -97,7 +103,10 @@
                 <span class="section-kicker">Active Incident</span>
                 <h2 id="crisis-type">-</h2>
               </div>
-              <span id="incident-id" class="chip chip-neutral">Incident -</span>
+              <div class="hero-heading-side">
+                <span id="incident-mode" class="chip chip-neutral">-</span>
+                <span id="incident-id" class="chip chip-neutral">Incident -</span>
+              </div>
             </div>
             <p id="summary" class="summary-text">-</p>
 
@@ -152,6 +161,17 @@
             </div>
             <p class="section-copy action-copy">Each action changes staff states, timeline events, and response posture. Active actions stay locked until you undo them.</p>
             <div id="escalation-actions" class="action-buttons"></div>
+          </section>
+
+          <section class="section-block floor-visual-block">
+            <div class="block-head">
+              <div>
+                <span class="section-kicker">Wow but Useful</span>
+                <h3>Response Flow Visualization</h3>
+              </div>
+            </div>
+            <p class="section-copy">A vertical floor stack showing where the incident is and how responder coverage is distributed across the property.</p>
+            <div id="floor-overview" class="floor-overview"></div>
           </section>
 
           <section class="section-block">

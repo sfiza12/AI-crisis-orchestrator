@@ -42,7 +42,7 @@ async function analyzeCrisis() {
     currentIncident = data;
     renderIncident(data);
     dashboard.classList.remove("hidden");
-    showBanner(data.severity);
+    showBanner(data.severity, data.response_mode);
     loadHistory();
   } catch (error) {
     alert(error.message || "Something went wrong. Check console for details.");
@@ -60,16 +60,19 @@ function renderIncident(data) {
   document.getElementById("incident-location").textContent = data.location;
   document.getElementById("updated-at").textContent = data.updated_at;
   document.getElementById("incident-id").textContent = `Incident #${data.incident_id}`;
+  document.getElementById("incident-mode").textContent = data.response_mode;
+  document.getElementById("incident-mode").className = `chip ${data.response_source === "ai" ? "chip-on-site" : "chip-busy"}`;
 
   const severityEl = document.getElementById("severity");
   severityEl.textContent = data.severity;
-  severityEl.className = `card-value severity-${data.severity.toLowerCase()}`;
+  severityEl.className = `meta-value severity-${data.severity.toLowerCase()}`;
 
   renderAssignments(data.assignments);
   renderImmediateActions(data.immediate_actions, data.summary);
   renderTimeline(data.timeline);
   renderChecklist(data.checklist);
   renderEscalationActions(data.available_actions, data.resolved);
+  renderFloorOverview(data.floor_overview);
   renderAnalytics(data.analytics);
 }
 
@@ -172,6 +175,38 @@ function renderEscalationActions(actions, resolved) {
   });
 }
 
+function renderFloorOverview(floors) {
+  const container = document.getElementById("floor-overview");
+  container.innerHTML = "";
+
+  floors.forEach(level => {
+    const row = document.createElement("div");
+    row.className = `floor-row ${level.is_incident_floor ? "floor-row-incident" : ""}`;
+
+    const respondersMarkup = level.responders.length
+      ? level.responders.map(responder => {
+          const availabilityClass = responder.availability.toLowerCase().replace(/\s+/g, "-");
+          return `<span class="floor-responder chip chip-${availabilityClass}">${escapeHtml(responder.name)}</span>`;
+        }).join("")
+      : '<span class="floor-empty">No assigned staff on this floor</span>';
+
+    row.innerHTML = `
+      <div class="floor-label-wrap">
+        <span class="floor-name">Floor ${escapeHtml(level.floor)}</span>
+        ${level.is_incident_floor ? '<span class="floor-incident-badge">Incident Zone</span>' : ""}
+      </div>
+      <div class="floor-track">
+        <div class="floor-metrics">
+          <span>${escapeHtml(level.responder_count)} staff linked</span>
+          <span>${escapeHtml(level.active_count)} active responders</span>
+        </div>
+        <div class="floor-responders">${respondersMarkup}</div>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
 async function triggerEscalation(action, mode = "apply") {
   if (!currentIncident) {
     return;
@@ -195,7 +230,7 @@ async function triggerEscalation(action, mode = "apply") {
 
     currentIncident = data;
     renderIncident(data);
-    showBanner(data.severity);
+    showBanner(data.severity, data.response_mode);
     loadHistory();
   } catch (error) {
     alert(error.message || "Unable to run escalation.");
@@ -227,13 +262,13 @@ function renderAnalytics(analytics) {
   });
 }
 
-function showBanner(severity) {
+function showBanner(severity, responseMode) {
   const banner = document.getElementById("alert-banner");
   const text = document.getElementById("banner-text");
 
   banner.className = "";
   banner.classList.add("banner-" + severity.toLowerCase());
-  text.textContent = `ACTIVE CRISIS - Severity: ${severity.toUpperCase()}`;
+  text.textContent = `ACTIVE CRISIS - Severity: ${severity.toUpperCase()} - ${responseMode.toUpperCase()}`;
   banner.classList.remove("hidden");
 }
 
@@ -255,7 +290,7 @@ async function loadHistory() {
       <div class="history-left">
         <div class="history-type">${escapeHtml(item.crisis_type)} <span class="chip chip-neutral">#${escapeHtml(item.incident_id)}</span></div>
         <div class="history-summary">${escapeHtml(item.summary)}</div>
-        <div class="history-summary">Timeline events: ${escapeHtml(item.timeline.length)} | Updates: ${escapeHtml(item.updated_at)}</div>
+        <div class="history-summary">Mode: ${escapeHtml(item.response_mode)} | Timeline events: ${escapeHtml(item.timeline.length)}</div>
       </div>
       <div class="history-right">
         <div class="history-time">${escapeHtml(item.timestamp)}</div>
@@ -315,6 +350,15 @@ function initVoiceInput() {
   voiceBtn.addEventListener("click", () => recognition.start());
 }
 
+function initQuickPrompts() {
+  document.querySelectorAll(".prompt-chip").forEach(button => {
+    button.addEventListener("click", () => {
+      document.getElementById("crisis-input").value = button.dataset.prompt;
+    });
+  });
+}
+
 initVoiceInput();
+initQuickPrompts();
 loadHistory();
 loadAnalytics();

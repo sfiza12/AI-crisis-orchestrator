@@ -6,12 +6,8 @@
 
 :root {
   --bg: #0a0d12;
-  --bg-2: #11171f;
   --panel: rgba(18, 24, 34, 0.92);
-  --panel-soft: rgba(22, 30, 42, 0.85);
-  --panel-strong: #121926;
   --line: rgba(154, 184, 212, 0.12);
-  --line-strong: rgba(154, 184, 212, 0.22);
   --text: #eef4fb;
   --muted: #98a9bb;
   --accent: #ff6e4a;
@@ -35,19 +31,22 @@ body {
 
 body[data-severity="high"] .hero-main,
 body[data-severity="high"] .hero-status-card,
-body[data-severity="high"] .priority-block {
+body[data-severity="high"] .priority-block,
+body[data-severity="high"] .floor-visual-block {
   border-color: rgba(255, 98, 98, 0.28);
 }
 
 body[data-severity="medium"] .hero-main,
 body[data-severity="medium"] .hero-status-card,
-body[data-severity="medium"] .priority-block {
+body[data-severity="medium"] .priority-block,
+body[data-severity="medium"] .floor-visual-block {
   border-color: rgba(255, 191, 95, 0.24);
 }
 
 body[data-severity="low"] .hero-main,
 body[data-severity="low"] .hero-status-card,
-body[data-severity="low"] .priority-block {
+body[data-severity="low"] .priority-block,
+body[data-severity="low"] .floor-visual-block {
   border-color: rgba(85, 216, 154, 0.22);
 }
 
@@ -202,7 +201,8 @@ body::before {
 .section-heading,
 .block-head,
 .assignment-top,
-.hero-heading {
+.hero-heading,
+.hero-heading-side {
   display: flex;
   justify-content: space-between;
   gap: 18px;
@@ -389,6 +389,21 @@ textarea:focus,
 select:focus {
   border-color: rgba(110, 215, 255, 0.5);
   box-shadow: 0 0 0 4px rgba(110, 215, 255, 0.08);
+}
+
+.quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.prompt-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(110, 215, 255, 0.08);
+  color: #dff7ff;
+  border: 1px solid rgba(110, 215, 255, 0.18);
 }
 
 .input-row {
@@ -640,6 +655,87 @@ button:disabled {
 
 .undo-btn {
   background: rgba(8, 12, 18, 0.7);
+}
+
+.floor-visual-block {
+  background:
+    linear-gradient(145deg, rgba(110, 215, 255, 0.08), transparent 38%),
+    rgba(18, 24, 34, 0.92);
+}
+
+.floor-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.floor-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.floor-row-incident .floor-track {
+  border-color: rgba(255, 110, 74, 0.34);
+  background: linear-gradient(145deg, rgba(255, 110, 74, 0.14), rgba(255, 255, 255, 0.03));
+}
+
+.floor-label-wrap {
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.floor-name {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.floor-incident-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 110, 74, 0.16);
+  border: 1px solid rgba(255, 110, 74, 0.24);
+  color: #ffd8cf;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.floor-track {
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px;
+}
+
+.floor-metrics {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.floor-responders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.floor-empty {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .assignment-card {
@@ -925,9 +1021,15 @@ button:disabled {
   .block-head,
   .assignment-top,
   .hero-heading,
-  .history-card {
+  .hero-heading-side,
+  .history-card,
+  .floor-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .floor-row {
+    display: flex;
   }
 
   .topbar-status {
@@ -949,6 +1051,10 @@ button:disabled {
 
   .history-right {
     align-items: flex-start;
+  }
+
+  .floor-metrics {
+    flex-direction: column;
   }
 }
 
@@ -986,5 +1092,9 @@ button:disabled {
   .timeline-content::before {
     left: 12px;
     top: -5px;
+  }
+
+  .quick-prompts {
+    flex-direction: column;
   }
 }

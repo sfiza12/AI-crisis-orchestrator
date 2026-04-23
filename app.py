@@ -15,6 +15,7 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-lite-001")
 DEBUG = os.getenv("FLASK_DEBUG", "true").lower() == "true"
+MAX_FLOORS = 5
 
 STAFF = [
     {"name": "Arjun", "role": "Security", "floor": 1},
@@ -55,6 +56,13 @@ CHECKLISTS = {
         "Create a communication lead and escalation path.",
         "Monitor guest safety until the area is stabilized.",
     ],
+}
+
+CRISIS_KEYWORDS = {
+    "Fire": ["fire", "smoke", "burn", "sparks", "flame", "gas leak", "explosion"],
+    "Medical": ["medical", "injury", "collapsed", "unresponsive", "bleeding", "patient", "ambulance", "faint"],
+    "Security": ["security", "threat", "fight", "suspicious", "intruder", "weapon", "violence", "theft"],
+    "Evacuation": ["evacuate", "evacuation", "stampede", "crowd", "leakage", "flood", "earthquake"],
 }
 
 ESCALATION_ACTIONS = {
@@ -111,6 +119,15 @@ def parse_model_json(raw_text):
     return json.loads(cleaned)
 
 
+def normalize_severity(value):
+    normalized = str(value).strip().lower()
+    if normalized == "high":
+        return "High"
+    if normalized == "low":
+        return "Low"
+    return "Medium"
+
+
 def validate_crisis_payload(result):
     required_keys = {"crisis_type", "severity", "summary", "assignments", "immediate_actions"}
 
@@ -120,7 +137,58 @@ def validate_crisis_payload(result):
     if not isinstance(result["immediate_actions"], list):
         raise ValueError("Model response used an invalid immediate_actions format.")
 
+    result["crisis_type"] = str(result["crisis_type"]).strip() or "General Incident"
+    result["severity"] = normalize_severity(result["severity"])
+    result["summary"] = str(result["summary"]).strip() or "An incident has been detected and requires attention."
+    result["immediate_actions"] = [str(item).strip() for item in result["immediate_actions"] if str(item).strip()][:3]
+    if not result["immediate_actions"]:
+        result["immediate_actions"] = CHECKLISTS["general"][:3]
     return result
+
+
+def infer_crisis_type_from_text(text):
+    lowered = text.lower()
+    for crisis_type, keywords in CRISIS_KEYWORDS.items():
+        if any(keyword in lowered for keyword in keywords):
+            return crisis_type
+    return "General Incident"
+
+
+def infer_severity_from_text(text, crisis_type):
+    lowered = text.lower()
+    high_keywords = ["spreading", "severe", "unresponsive", "bleeding", "weapon", "explosion", "panic", "trapped"]
+    low_keywords = ["small", "minor", "contained", "slow", "isolated"]
+
+    if any(keyword in lowered for keyword in high_keywords):
+        return "High"
+    if any(keyword in lowered for keyword in low_keywords):
+        return "Low"
+    if crisis_type in {"Fire", "Medical", "Security"}:
+        return "High" if crisis_type == "Medical" and "collapsed" in lowered else "Medium"
+    return "Medium"
+
+
+def infer_checklist_type(crisis_type):
+    lowered = crisis_type.lower()
+    for key in ("fire", "medical", "security", "evacuation"):
+        if key in lowered:
+            return key
+    return "general"
+
+
+def build_fallback_result(crisis_input):
+    crisis_type = infer_crisis_type_from_text(crisis_input)
+    severity = infer_severity_from_text(crisis_input, crisis_type)
+    checklist_key = infer_checklist_type(crisis_type)
+    immediate_actions = CHECKLISTS[checklist_key][:3]
+
+    return {
+        "crisis_type": crisis_type,
+        "severity": severity,
+        "summary": f"{crisis_type} incident detected. Continuity mode created a structured response while AI classification was unavailable.",
+        "assignments": [],
+        "immediate_actions": immediate_actions,
+    }
 
 
 def get_floor_status(staff_floor, crisis_floor):
@@ -188,25 +256,12 @@ def build_assignments(crisis_type, crisis_floor, staff_members):
     return assignments
 
 
-def infer_checklist_type(crisis_type):
-    lowered = crisis_type.lower()
-    for key in ("fire", "medical", "security", "evacuation"):
-        if key in lowered:
-            return key
-    return "general"
-
-
 def build_checklist(crisis_type):
     checklist_key = infer_checklist_type(crisis_type)
-    items = []
-    for index, item in enumerate(CHECKLISTS[checklist_key]):
-        items.append(
-            {
-                "label": item,
-                "completed": index == 0,
-            }
-        )
-    return items
+    return [
+        {"label": item, "completed": index == 0}
+        for index, item in enumerate(CHECKLISTS[checklist_key])
+    ]
 
 
 def build_timeline(crisis_type, crisis_floor, assignments):
@@ -218,7 +273,7 @@ def build_timeline(crisis_type, crisis_floor, assignments):
         },
         {
             "time": current_time_label(),
-            "title": "AI triage completed",
+            "title": "Response plan generated",
             "detail": "Severity, summary, and immediate response plan were generated.",
         },
         {
@@ -230,6 +285,35 @@ def build_timeline(crisis_type, crisis_floor, assignments):
             ),
         },
     ]
+
+
+def build_floor_overview(assignments, crisis_floor):
+    floors = []
+    for floor_number in range(MAX_FLOORS, 0, -1):
+        responders = [
+            {
+                "name": member["name"],
+                "role": member["role"],
+                "availability": member["availability"],
+            }
+            for member in assignments
+            if member["floor"] == floor_number
+        ]
+        active_count = sum(
+            1
+            for member in responders
+            if member["availability"] in {"Busy", "Responding", "On-site"}
+        )
+        floors.append(
+            {
+                "floor": floor_number,
+                "is_incident_floor": floor_number == crisis_floor,
+                "responder_count": len(responders),
+                "active_count": active_count,
+                "responders": responders,
+            }
+        )
+    return floors
 
 
 def build_available_actions(incident):
@@ -279,6 +363,7 @@ def apply_escalation(incident, action_key):
         for member in incident["assignments"]:
             member["availability"] = "Available"
 
+    incident["floor_overview"] = build_floor_overview(incident["assignments"], crisis_floor)
     incident["timeline"].append(
         {
             "time": now,
@@ -295,6 +380,7 @@ def rebuild_incident_state(incident):
     incident["assignments"] = deepcopy(incident["base_assignments"])
     incident["checklist"] = deepcopy(incident["base_checklist"])
     incident["timeline"] = deepcopy(incident["base_timeline"])
+    incident["floor_overview"] = deepcopy(incident["base_floor_overview"])
 
     for action_key in incident.get("applied_actions", []):
         apply_escalation(incident, action_key)
@@ -352,11 +438,75 @@ def build_analytics(history):
     }
 
 
+def build_incident_payload(result, crisis_input, crisis_floor, sorted_staff, response_source):
+    global incident_counter
+
+    assignments = build_assignments(result["crisis_type"], crisis_floor, sorted_staff)
+    timeline = build_timeline(result["crisis_type"], crisis_floor, assignments)
+
+    if response_source == "fallback":
+        timeline.insert(
+            1,
+            {
+                "time": current_time_label(),
+                "title": "Continuity mode activated",
+                "detail": "The AI service was unavailable, so the app switched to rule-based fallback triage.",
+            },
+        )
+
+    checklist = build_checklist(result["crisis_type"])
+    floor_overview = build_floor_overview(assignments, crisis_floor)
+    incident_counter += 1
+
+    return {
+        "incident_id": incident_counter,
+        "crisis_input": crisis_input,
+        "crisis_type": result["crisis_type"],
+        "severity": result["severity"],
+        "summary": result["summary"],
+        "crisis_floor": crisis_floor,
+        "location": f"Floor {crisis_floor}",
+        "timestamp": current_time_label(),
+        "updated_at": current_time_label(),
+        "resolved": False,
+        "response_source": response_source,
+        "response_mode": "AI Assisted" if response_source == "ai" else "Continuity Mode",
+        "assignments": assignments,
+        "timeline": timeline,
+        "checklist": checklist,
+        "floor_overview": floor_overview,
+        "immediate_actions": result["immediate_actions"],
+        "applied_actions": [],
+        "base_severity": result["severity"],
+        "base_assignments": deepcopy(assignments),
+        "base_checklist": deepcopy(checklist),
+        "base_timeline": deepcopy(timeline),
+        "base_floor_overview": deepcopy(floor_overview),
+    }
+
+
 def public_incident_payload(incident):
-    payload = dict(incident)
-    payload["available_actions"] = build_available_actions(incident)
-    payload["analytics"] = build_analytics(crisis_history)
-    return payload
+    return {
+        "incident_id": incident["incident_id"],
+        "crisis_input": incident["crisis_input"],
+        "crisis_type": incident["crisis_type"],
+        "severity": incident["severity"],
+        "summary": incident["summary"],
+        "crisis_floor": incident["crisis_floor"],
+        "location": incident["location"],
+        "timestamp": incident["timestamp"],
+        "updated_at": incident["updated_at"],
+        "resolved": incident["resolved"],
+        "response_source": incident["response_source"],
+        "response_mode": incident["response_mode"],
+        "assignments": incident["assignments"],
+        "timeline": incident["timeline"],
+        "checklist": incident["checklist"],
+        "floor_overview": incident["floor_overview"],
+        "immediate_actions": incident["immediate_actions"],
+        "available_actions": build_available_actions(incident),
+        "analytics": build_analytics(crisis_history),
+    }
 
 
 @app.route("/")
@@ -366,11 +516,6 @@ def index():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    global incident_counter
-
-    if not OPENROUTER_API_KEY:
-        return jsonify({"error": "Missing OPENROUTER_API_KEY in environment configuration."}), 500
-
     data = request.get_json(silent=True) or {}
     crisis_input = data.get("crisis", "").strip()
 
@@ -408,52 +553,34 @@ Respond only in this exact JSON format, with no extra text:
 }}
 """
 
-    try:
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": OPENROUTER_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
+    result = None
+    response_source = "fallback"
 
-        response_json = response.json()
-        result_text = response_json["choices"][0]["message"]["content"]
-        result = validate_crisis_payload(parse_model_json(result_text))
-    except requests.RequestException:
-        return jsonify({"error": "The AI service is unavailable right now. Please try again."}), 502
-    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
-        return jsonify({"error": "The AI returned an unexpected response. Please try again."}), 502
+    if OPENROUTER_API_KEY:
+        try:
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": OPENROUTER_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=25,
+            )
+            response.raise_for_status()
+            response_json = response.json()
+            result_text = response_json["choices"][0]["message"]["content"]
+            result = validate_crisis_payload(parse_model_json(result_text))
+            response_source = "ai"
+        except (requests.RequestException, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+            result = build_fallback_result(crisis_input)
+    else:
+        result = build_fallback_result(crisis_input)
 
-    assignments = build_assignments(result["crisis_type"], crisis_floor, sorted_staff)
-    incident_counter += 1
-    incident = {
-        "incident_id": incident_counter,
-        "crisis_input": crisis_input,
-        "crisis_type": result["crisis_type"],
-        "severity": result["severity"],
-        "summary": result["summary"],
-        "crisis_floor": crisis_floor,
-        "location": f"Floor {crisis_floor}",
-        "timestamp": current_time_label(),
-        "updated_at": current_time_label(),
-        "resolved": False,
-        "assignments": assignments,
-        "timeline": build_timeline(result["crisis_type"], crisis_floor, assignments),
-        "checklist": build_checklist(result["crisis_type"]),
-        "immediate_actions": result["immediate_actions"],
-        "applied_actions": [],
-        "base_severity": result["severity"],
-        "base_assignments": deepcopy(assignments),
-        "base_checklist": deepcopy(build_checklist(result["crisis_type"])),
-        "base_timeline": deepcopy(build_timeline(result["crisis_type"], crisis_floor, assignments)),
-    }
+    incident = build_incident_payload(result, crisis_input, crisis_floor, sorted_staff, response_source)
     crisis_history.append(incident)
 
     return jsonify(public_incident_payload(incident))
@@ -499,7 +626,7 @@ def escalate():
 
 @app.route("/history")
 def history():
-    return jsonify(crisis_history)
+    return jsonify([public_incident_payload(incident) for incident in crisis_history])
 
 
 @app.route("/analytics")
